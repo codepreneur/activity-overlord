@@ -7,6 +7,9 @@
 
 module.exports = {
 
+	// prevents saving csrf, passwords etc to database AND client getting them
+	schema: true,
+
   attributes: {
 
   	name: {
@@ -28,6 +31,16 @@ module.exports = {
   	encryptedPassword: {
   		type: 'string'
   	}
+
+  	// prevents client getting csrf, passwords etc.
+  	// toJSON: function(){
+  	// 	var obj = this.toObject();
+  	// 	delete obj.password;
+  	// 	delete obj.confirmation;
+  	// 	delete obj.encryptedPassword;
+  	// 	delete obj._csrf;
+  	// 	return obj;
+  	// }
 
   }
 };
