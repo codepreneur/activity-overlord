@@ -30,18 +30,32 @@ module.exports = {
 
   	encryptedPassword: {
   		type: 'string'
-  	}
+  	},
 
   	// prevents client getting csrf, passwords etc.
-  	// toJSON: function(){
-  	// 	var obj = this.toObject();
-  	// 	delete obj.password;
-  	// 	delete obj.confirmation;
-  	// 	delete obj.encryptedPassword;
-  	// 	delete obj._csrf;
-  	// 	return obj;
-  	// }
+  	toJSON: function(){
+  		var obj = this.toObject();
+  		delete obj.password;
+  		delete obj.confirmation;
+  		delete obj.encryptedPassword;
+  		delete obj._csrf;
+  		return obj;
+  	}
 
+  },
+
+  beforeCreate: function(values, next){
+    if(!values.password || values.password != values.confirmation){
+      return next({err: ["Password doesnt match password confirmation"]});
+    }
+    // 10 is the number of rounds its gonna do hashing algortihm
+    require('bcrypt').hash(values.password, 10, function passwordEncrypted(err, encryptedPassword){
+      if(err) return next(err);
+      values.encryptedPassword = encryptedPassword;
+      // values.online = true;
+      next();
+    });
   }
+
 };
 

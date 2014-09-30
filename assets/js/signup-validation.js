@@ -15,7 +15,7 @@ $(document).ready(function(){
 			},
 			confirmation: {
 				minlength: 6,
-				equalTo: "#password"
+				// equalTo: "#password"
 			}
 		},
 		success: function(element){
