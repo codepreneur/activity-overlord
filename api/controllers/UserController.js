@@ -42,10 +42,6 @@ module.exports = {
 	},
 
 	index: function(req, res, next){
-
-		console.log(new Date());
-		console.log(req.session.authenticated);
-		
 		User.find(function foundUsers(err, users){
 			if(err) return next(err);
 			res.view({
