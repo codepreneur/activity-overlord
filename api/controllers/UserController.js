@@ -1,91 +1,177 @@
 /**
  * UserController
  *
- * @description :: Server-side logic for managing users
- * @help        :: See http://links.sailsjs.org/docs/controllers
+ * @module    :: Controller
+ * @description :: Contains logic for handling requests.
  */
 
 module.exports = {
-	
-	new: function(req, res){
-		res.view();
-	},
 
-	create: function(req, res, next){
+  // This loads the sign-up page --> new.ejs
+  'new': function(req, res) {
+    res.view();
+  },
 
-		User.create(req.params.all(), function userCreated(err, user){
+  create: function(req, res, next) {
 
-			if (err) {
-				console.log(err);
-				// not available to our views
-				req.session.flash = {
-					err: err
-				}
+    var userObj = {
+      name: req.param('name'),
+      title: req.param('title'),
+      email: req.param('email'),
+      password: req.param('password'),
+      confirmation: req.param('confirmation')
+    }
 
-				return res.redirect('/user/new');
-			}
+    // Create a User with the params sent from 
+    // the sign-up form --> new.ejs
+    User.create(userObj, function userCreated(err, user) {
 
-			req.session.authenticated = true;
-			req.session.User = user;
+      // // If there's an error
+      // if (err) return next(err);
 
-			// res.json(user);
-			res.redirect('/user/show/' + user.id);
-		});
+      if (err) {
+        console.log(err);
+        req.session.flash = {
+          err: err
+        }
 
-	},
+        // If error redirect back to sign-up page
+        return res.redirect('/user/new');
+      }
 
-	show: function(req, res, next){
-		User.findOne(req.param('id'), function foundUser(err, user){
-			if(err) return next(err);
-			if(!user) return next();
-			res.view({
-				user: user
-			});
-		});
-	},
+      // Log user in
+      req.session.authenticated = true;
+      req.session.User = user;
 
-	index: function(req, res, next){
-		User.find(function foundUsers(err, users){
-			if(err) return next(err);
-			res.view({
-				users: users
-			});
-		});
-	},
+      // Change status to online
+      user.online = true;
+      user.save(function(err, user) {
+        if (err) return next(err);
 
-	edit: function(req, res, next){
-		User.findOne(req.param('id'), function foundUser(err, user){
-			if(err) return next(err);
-			if(!user) return next('User doesnt exist');
+      // add the action attribute to the user object for the flash message.
+      user.action = " signed-up and logged-in."
 
-			res.view({
-				user: user
-			});
-		});
-	},
+      // Let other subscribed sockets know that the user was created.
+      User.publishCreate(user);
 
-	update: function(req, res, next){
-		User.update(req.param('id'), req.params.all(), function userUpdated(err){
-			if(err){
-				return res.redirect('/user/edit/' + req.param('id'));
-			}
+        // After successfully creating the user
+        // redirect to the show action
+        // From ep1-6: //res.json(user); 
 
-			res.redirect('/user/show/' + req.param('id'));
-		});
-	},
+        res.redirect('/user/show/' + user.id);
+      });
+    });
+  },
 
-	destroy: function(req, res, next){
-		User.findOne(req.param('id'), function foundUser(err, user){
-			if(err) return next(err);
-			if(!user) return next('User doesnt exist');
+  // render the profile view (e.g. /views/show.ejs)
+  show: function(req, res, next) {
+    User.findOne(req.param('id'), function foundUser(err, user) {
+      if (err) return next(err);
+      if (!user) return next();
+      res.view({
+        user: user
+      });
+    });
+  },
 
-			User.destroy(req.param('id'), function userDestroyed(err){
-				if(err) return next(err);
-			});
+  index: function(req, res, next) {
 
-			res.redirect('/user');
-		})
-	}
+    // Get an array of all users in the User collection(e.g. table)
+    User.find(function foundUsers(err, users) {
+      if (err) return next(err);
+      // pass the array down to the /views/index.ejs page
+      res.view({
+        users: users
+      });
+    });
+  },
+
+  // render the edit view (e.g. /views/edit.ejs)
+  edit: function(req, res, next) {
+
+    // Find the user from the id passed in via params
+    User.findOne(req.param('id'), function foundUser(err, user) {
+      if (err) return next(err);
+      if (!user) return next('User doesn\'t exist.');
+
+      res.view({
+        user: user
+      });
+    });
+  },
+
+  // process the info from edit view
+  update: function(req, res, next) {
+
+    if (req.session.User.admin) {
+      var userObj = {
+        name: req.param('name'),
+        title: req.param('title'),
+        email: req.param('email'),
+        admin: req.param('admin')
+      }
+    } else {
+      var userObj = {
+        name: req.param('name'),
+        title: req.param('title'),
+        email: req.param('email')
+      }
+    }
+
+    User.update(req.param('id'), userObj, function userUpdated(err) {
+      if (err) {
+        return res.redirect('/user/edit/' + req.param('id'));
+      }
+
+      res.redirect('/user/show/' + req.param('id'));
+    });
+  },
+
+  destroy: function(req, res, next) {
+
+    User.findOne(req.param('id'), function foundUser(err, user) {
+      if (err) return next(err);
+
+      if (!user) return next('User doesn\'t exist.');
+
+      User.destroy(req.param('id'), function userDestroyed(err) {
+        if (err) return next(err);
+
+        // Inform other sockets (e.g. connected sockets that are subscribed) that this user is now logged in
+        User.publishUpdate(user.id, {
+          name: user.name,
+          action: ' has been destroyed.'
+        });
+
+        // Let other sockets know that the user instance was destroyed.
+        User.publishDestroy(user.id);
+
+      });        
+
+      res.redirect('/user');
+
+    });
+  },
+
+  // This action works with app.js socket.get('/user/subscribe') to
+  // subscribe to the User model classroom and instances of the user
+  // model
+  subscribe: function(req, res) {
+ 
+    // Find all current users in the user model
+    User.find(function foundUsers(err, users) {
+      if (err) return next(err);
+ 
+      // subscribe this socket to the User model classroom
+      User.subscribe(req.socket);
+ 
+      // subscribe this socket to the user instance rooms
+      User.subscribe(req.socket, users);
+ 
+      // This will avoid a warning from the socket for trying to render
+      // html over the socket.
+      res.send(200);
+    });
+  }
 
 };
-
